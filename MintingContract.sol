@@ -23,9 +23,6 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
 
     string internal yin; //Night traits
     string internal yang; //Day traits
-    
-    mapping(address => uint256) public raffleMintCount; //Amount minted per wallet during raffle phase
-    mapping(address => uint256) public whitelistMintCount; //Amount minted per wallet during whitelist phase
 
     //Max supply can be set multiple times, but must always be higher than current supply and not 0.
     function setMaxSupply(uint256 value) public onlyOwner { 
@@ -98,8 +95,9 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
         require(msg.value >= mintPrice, "Insufficient funds");
         require(verifySingleMint(msg.sender, _merkleProof), "Incorrect merkle tree proof");
         require(totalSupply() < maxSupply, "Max supply exceeded");
-        require(raffleMintCount[msg.sender] == 0, "Max mint for this wallet exceeded");
-        raffleMintCount[msg.sender] += 1;
+        uint64 auxData = _getAux(msg.sender);
+        require(auxData & 0x1 == 0, "Max mint for this wallet exceeded");
+        _setAux(msg.sender, auxData | 0x1); //Setting bit 0 to keep track of raffle mint
         _mint(msg.sender, 1);
     }
 
@@ -111,8 +109,10 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
         require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
         (address minter, uint256 maxAmount) = abi.decode(data, (address, uint256));
         require(msg.sender == minter, "Address not whitelisted");
-        require(whitelistMintCount[msg.sender] + amount <= maxAmount, "Max mint for this wallet exceeded");
-        whitelistMintCount[msg.sender] += amount;
+        uint64 auxData = _getAux(msg.sender);
+        uint64 mintedAmount = (auxData >> 1) & 0xFF; //Cannot be larger than 255 (0xFF). Bits 1-8 keep track of whitelist mint amounts.
+        require(mintedAmount + amount <= maxAmount, "Max mint for this wallet exceeded");
+        _setAux(msg.sender, auxData | ((mintedAmount + uint64(amount)) << 1)); //Setting bits 1-8. Assuming no one on whitelist has > 255 mints
         _mint(msg.sender, amount);
     }
 
@@ -128,7 +128,8 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
     //Admin mint for airdrops/marketing
     function adminMint(address to, uint256 amount) external onlyOwner {
         require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
-        _mint(to, amount);         
+        require(amount <= 30, "Mint amount too large for one transaction");
+        _mint(to, amount);        
     }
 
     //Withdraw Eth in contract to specified address
