@@ -26,7 +26,7 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
 
     //Max supply can be set multiple times, but must always be higher than current supply and not 0.
     function setMaxSupply(uint256 value) public onlyOwner { 
-        require(value > 0 && totalSupply() < value, "Invalid max supply");
+        require(value > 0 && value <= 10000 && totalSupply() <= value,  "Invalid max supply");
         maxSupply = value;
     }
     
