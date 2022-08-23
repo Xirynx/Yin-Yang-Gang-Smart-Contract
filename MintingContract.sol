@@ -91,6 +91,7 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
 
     //Raffle mint. 1 per wallet.
     function raffleMint(bytes32[] calldata _merkleProof) external payable {
+        require(currentPhase == Phase.RAFFLE, "Whitelist sale not started"); 
         require(msg.value >= mintPrice, "Insufficient funds");
         require(verifySingleMint(msg.sender, _merkleProof), "Incorrect merkle tree proof");
         require(totalSupply() < maxSupply, "Max supply exceeded");
@@ -102,6 +103,7 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
 
     //Whitelist mint. Varying amount of mints per wallet. Decoded in merkle tree leaves. Format of merkle tree leaves: abi.encode(address wallet, uint256 mintAllowance)
     function whitelistMint(uint256 amount, bytes32[] calldata _merkleProof) external {
+        require(currentPhase == Phase.WHITELIST, "Whitelist sale not started"); 
         bytes memory data = abi.encode(msg.sender, amount);
         require(verifyMultiMint(data, _merkleProof), "Incorrect merkle tree proof");
         require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
