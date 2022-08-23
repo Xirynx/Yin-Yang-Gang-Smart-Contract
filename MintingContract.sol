@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "erc721a/contracts/ERC721A.sol";
+import "erc721a/contracts/extensions/ERC721ABurnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract YinYangGangNFT is ERC721("Yin Yang Gang", "YYG"), ERC721Enumerable, ERC721Burnable, Ownable {
+contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Ownable {
     uint256 public maxSupply; //Maximum mintable supply
     uint256 public mintPrice; //Mint Price for RAFFLE and PUBLIC
-    uint256 public mintIndex; //Current mint number keeping track of token IDs. Increments for each mint
 
     bytes32 public merkleRoot;
     
@@ -21,7 +19,7 @@ contract YinYangGangNFT is ERC721("Yin Yang Gang", "YYG"), ERC721Enumerable, ERC
         PUBLIC
     } //Phases of the mint. Raffle will be 1 per wallet, whitelist is varying amounts per wallet, public is free for all, 1 per tx.
 
-    Phase currentPhase = Phase.NONE; //Initialise phase enum. Maybe unecessary...?
+    Phase currentPhase = Phase.NONE; //Declare + Initialise phase enum. Maybe unecessary to provide intial value...?
 
     string internal yin; //Night traits
     string internal yang; //Day traits
@@ -40,7 +38,7 @@ contract YinYangGangNFT is ERC721("Yin Yang Gang", "YYG"), ERC721Enumerable, ERC
         mintPrice = _mintPrice;
     }
 
-    //Merkle tree can be set manually if needed
+    //Merkle root can be set manually if needed
     function setMerkleRoot(bytes32 _merkleRoot) public onlyOwner { 
         merkleRoot = _merkleRoot;
     }
@@ -73,7 +71,7 @@ contract YinYangGangNFT is ERC721("Yin Yang Gang", "YYG"), ERC721Enumerable, ERC
         yang = _yang;
     }
 
-    //Switch to night time URI at 22h00 UTC. Switch back to day time at 08h00 UTC
+    //Switch to night time base URI at 22h00 UTC. Switch back to day time at 08h00 UTC
     function _baseURI() internal view override returns (string memory) {
         if (((block.timestamp + 7200) % 86400) < 36000) {
             return yin; 
@@ -102,23 +100,20 @@ contract YinYangGangNFT is ERC721("Yin Yang Gang", "YYG"), ERC721Enumerable, ERC
         require(totalSupply() < maxSupply, "Max supply exceeded");
         require(raffleMintCount[msg.sender] == 0, "Max mint for this wallet exceeded");
         raffleMintCount[msg.sender] += 1;
-        _safeMint(msg.sender, ++mintIndex);
+        _mint(msg.sender, 1);
     }
 
-    //Whitelist mint. Varying amount of mints per wallet. Decoded in merkle tree leaves. Format stored in merkle tree leaves: abi.encode(address wallet, uint256 mintAllowance)
+    //Whitelist mint. Varying amount of mints per wallet. Decoded in merkle tree leaves. Format of merkle tree leaves: abi.encode(address wallet, uint256 mintAllowance)
     function whitelistMint(uint256 amount, bytes memory data, bytes32[] calldata _merkleProof) external {
         require(currentPhase == Phase.WHITELIST, "Whitelist sale not started");
         require(verifyMultiMint(data, _merkleProof), "Incorrect merkle tree proof");
+        require(amount <= 30, "Mint amount too large for one transaction");
+        require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
         (address minter, uint256 maxAmount) = abi.decode(data, (address, uint256));
         require(msg.sender == minter, "Address not whitelisted");
-        require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
         require(whitelistMintCount[msg.sender] + amount <= maxAmount, "Max mint for this wallet exceeded");
         whitelistMintCount[msg.sender] += amount;
-        unchecked {
-            for (uint256 i = 0; i < amount; i++) {
-                _safeMint(msg.sender, ++mintIndex);
-            }
-        }
+        _mint(msg.sender, amount);
     }
 
     //Public mint. Free for all, 1 mint per transaction, no contracts allowed.
@@ -127,34 +122,17 @@ contract YinYangGangNFT is ERC721("Yin Yang Gang", "YYG"), ERC721Enumerable, ERC
         require(tx.origin == msg.sender, "Caller is not origin");
         require(msg.value >= mintPrice, "Insufficient funds");
         require(totalSupply() < maxSupply, "Max supply exceeded");
-        _safeMint(msg.sender, ++mintIndex);
+        _mint(msg.sender, 1);
     }
 
     //Admin mint for airdrops/marketing
     function adminMint(address to, uint256 amount) external onlyOwner {
         require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
-        unchecked {
-             for (uint256 i = 0; i < amount; i++) {
-                _safeMint(to, ++mintIndex);
-            }           
-        }
+        _mint(to, amount);         
     }
 
-    // Compulsory overrides
-
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId)
-        internal
-        override(ERC721, ERC721Enumerable)
-    {
-        super._beforeTokenTransfer(from, to, tokenId);
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, ERC721Enumerable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
+    //Withdraw Eth in contract to specified address
+    function withdrawFunds(address to) external onlyOwner {
+        payable(to).transfer(address(this).balance);
     }
 }
