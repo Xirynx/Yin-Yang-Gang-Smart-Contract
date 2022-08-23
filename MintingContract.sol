@@ -91,28 +91,23 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
 
     //Raffle mint. 1 per wallet.
     function raffleMint(bytes32[] calldata _merkleProof) external payable {
-        require(currentPhase == Phase.RAFFLE, "Raffle sale not started");
         require(msg.value >= mintPrice, "Insufficient funds");
         require(verifySingleMint(msg.sender, _merkleProof), "Incorrect merkle tree proof");
         require(totalSupply() < maxSupply, "Max supply exceeded");
         uint64 auxData = _getAux(msg.sender);
-        require(auxData & 0x1 == 0, "Max mint for this wallet exceeded");
-        _setAux(msg.sender, auxData | 0x1); //Setting bit 0 to keep track of raffle mint
+        require(auxData & 1 == 0, "Max mint for this phase exceeded");
+        _setAux(msg.sender, auxData | 1); //Setting bit 0 to keep track of raffle mint
         _mint(msg.sender, 1);
     }
 
     //Whitelist mint. Varying amount of mints per wallet. Decoded in merkle tree leaves. Format of merkle tree leaves: abi.encode(address wallet, uint256 mintAllowance)
-    function whitelistMint(uint256 amount, bytes memory data, bytes32[] calldata _merkleProof) external {
-        require(currentPhase == Phase.WHITELIST, "Whitelist sale not started");
+    function whitelistMint(uint256 amount, bytes32[] calldata _merkleProof) external {
+        bytes memory data = abi.encode(msg.sender, amount);
         require(verifyMultiMint(data, _merkleProof), "Incorrect merkle tree proof");
-        require(amount <= 30, "Mint amount too large for one transaction");
         require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
-        (address minter, uint256 maxAmount) = abi.decode(data, (address, uint256));
-        require(msg.sender == minter, "Address not whitelisted");
         uint64 auxData = _getAux(msg.sender);
-        uint64 mintedAmount = (auxData >> 1) & 0xFF; //Cannot be larger than 255 (0xFF). Bits 1-8 keep track of whitelist mint amounts.
-        require(mintedAmount + amount <= maxAmount, "Max mint for this wallet exceeded");
-        _setAux(msg.sender, auxData | ((mintedAmount + uint64(amount)) << 1)); //Setting bits 1-8. Assuming no one on whitelist has > 255 mints
+        require(auxData & (1 << 1) == 0, "Max mint for this phase exceeded");
+        _setAux(msg.sender, auxData | (1 << 1)); //Setting bit 1 to keep track of whitelist mint
         _mint(msg.sender, amount);
     }
 
