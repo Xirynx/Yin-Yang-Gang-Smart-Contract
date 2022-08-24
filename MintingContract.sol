@@ -130,7 +130,9 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
     }
 
     //Withdraw Eth in contract to specified address
-    function withdrawFunds(address to) external onlyOwner {
-        payable(to).transfer(address(this).balance);
+    function withdrawFunds(address to) public onlyOwner {
+        uint256 balance = address(this).balance;
+        (bool callSuccess, ) = payable(to).call{value: balance}("");
+        require(callSuccess, "Call failed");
     }
 }
