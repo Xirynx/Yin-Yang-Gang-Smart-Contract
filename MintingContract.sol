@@ -26,7 +26,7 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
 
     //Max supply can be set multiple times, but must always be higher than current supply and not 0.
     function setMaxSupply(uint256 value) public onlyOwner { 
-        require(value > 0 && value <= 10000 && totalSupply() <= value,  "Invalid max supply");
+        require(value > 0 && value <= 10000 && _totalMinted() <= value,  "Invalid max supply");
         maxSupply = value;
     }
     
@@ -94,7 +94,7 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
         require(currentPhase == Phase.RAFFLE, "Whitelist sale not started"); 
         require(msg.value >= mintPrice, "Insufficient funds");
         require(verifySingleMint(msg.sender, _merkleProof), "Incorrect merkle tree proof");
-        require(totalSupply() < maxSupply, "Max supply exceeded");
+        require(_totalMinted() < maxSupply, "Max supply exceeded");
         uint64 auxData = _getAux(msg.sender);
         require(auxData & 1 == 0, "Max mint for this phase exceeded");
         _setAux(msg.sender, auxData | 1); //Setting bit 0 to keep track of raffle mint
@@ -106,7 +106,7 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
         require(currentPhase == Phase.WHITELIST, "Whitelist sale not started"); 
         bytes memory data = abi.encode(msg.sender, amount);
         require(verifyMultiMint(data, _merkleProof), "Incorrect merkle tree proof");
-        require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
+        require(_totalMinted() + amount <= maxSupply, "Max supply exceeded");
         uint64 auxData = _getAux(msg.sender);
         require(auxData & (1 << 1) == 0, "Max mint for this phase exceeded");
         _setAux(msg.sender, auxData | (1 << 1)); //Setting bit 1 to keep track of whitelist mint
@@ -118,13 +118,13 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
         require(currentPhase == Phase.PUBLIC, "Public sale not started");
         require(tx.origin == msg.sender, "Caller is not origin");
         require(msg.value >= mintPrice, "Insufficient funds");
-        require(totalSupply() < maxSupply, "Max supply exceeded");
+        require(_totalMinted() < maxSupply, "Max supply exceeded");
         _mint(msg.sender, 1);
     }
 
     //Admin mint for airdrops/marketing
     function adminMint(address to, uint256 amount) external onlyOwner {
-        require(totalSupply() + amount <= maxSupply, "Max supply exceeded");
+        require(_totalMinted() + amount <= maxSupply, "Max supply exceeded");
         require(amount <= 30, "Mint amount too large for one transaction");
         _mint(to, amount);        
     }
