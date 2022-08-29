@@ -19,7 +19,7 @@ contract YinYangGangNFT is ERC721A("Yin Yang Gang", "YYG"), ERC721ABurnable, Own
         PUBLIC
     } //Phases of the mint. Raffle will be 1 per wallet, whitelist is varying amounts per wallet, public is free for all, 1 per tx.
 
-    Phase currentPhase = Phase.NONE; //Declare + Initialise phase enum. Maybe unecessary to provide intial value...?
+    Phase public currentPhase = Phase.NONE; //Declare + Initialise phase enum. Maybe unecessary to provide intial value...?
 
     string internal yin; //Night traits
     string internal yang; //Day traits
